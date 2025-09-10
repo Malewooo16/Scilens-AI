@@ -22,11 +22,11 @@ model Account {
   provider          String
   providerAccountId String
   refresh_token     String?
-  access_token      String?
+  access_token      String?  @db.LongText
   expires_at        Int?
   token_type        String?
-  scope             String?
-  id_token          String?
+  scope             String?  
+  id_token          String? @db.LongText
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -109,6 +109,10 @@ model ResearchQuery {
   matchedDocs     Json?
   knowledgeGraph  Json?
   visualizations  Json?
+  summary         String?       @db.Text
+  report          String?       @db.Text
+  gaps            String?       @db.Text
+  table           String?       @db.Text
 
   //relations
   documents   Document[]

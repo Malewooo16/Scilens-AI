@@ -1,10 +1,8 @@
-import { table } from "@/actions/table";
+import { prisma } from "@/db/prisma";
 
 type Reference = {
   sourceUrl: string;
-  metadata?: {
-    title?: string;
-  };
+  title?: string;
 };
 
 export type TableData = {
@@ -13,23 +11,20 @@ export type TableData = {
 };
 
 type Props = {
-  researchQuery: string;
+  researchQueryId: string;
 };
 
-export default async function ResearchTable({ researchQuery }: Props) {
-  const data = await table(researchQuery);
+export default async function ResearchTable({ researchQueryId }: Props) {
+  const researchQuery = await prisma.researchQuery.findUnique({
+    where: { id: researchQueryId },
+    include: { documents: true },
+  });
 
-  if (!data?.table) {
-    return <p className="text-teal-700">No results found for &quot;{researchQuery}&quot;.</p>;
+  if (!researchQuery?.table) {
+    return <p className="text-teal-700">No table available for this research query.</p>;
   }
 
-  // Ensure table is a string before splitting
-  const tableString =
-    typeof data.table === "string"
-      ? data.table
-      : Array.isArray(data.table)
-      ? data.table.map((item: any) => (typeof item === "string" ? item : "")).join("\n")
-      : "";
+  const tableString = researchQuery.table;
 
   // Parse Gemini response into rows and columns
   const rows = tableString
@@ -40,17 +35,19 @@ export default async function ResearchTable({ researchQuery }: Props) {
 
   const headers = rows.shift() || [];
 
+  const sources = researchQuery.documents.map(doc => ({ sourceUrl: doc.sourceUrl || '', metadata: { title: doc.title } }));
+
   const uniqueTableSources = (sources?: Reference[]) => {
-  if (!sources) return [];
-  const map = new Map<string, Reference>();
-  sources.forEach((s) => {
-    if (s.sourceUrl && !map.has(s.sourceUrl)) map.set(s.sourceUrl, s);
-  });
-  return Array.from(map.values());
-};
+    if (!sources) return [];
+    const map = new Map<string, Reference>();
+    sources.forEach((s) => {
+      if (s.sourceUrl && !map.has(s.sourceUrl)) map.set(s.sourceUrl, s);
+    });
+    return Array.from(map.values());
+  };
 
   return (
-    <div className="w-full mx-auto p-4 space-y-4">
+    <div className="w-full mx-auto p-4 space-y-4 md:max-w-3xl lg:max-w-5xl">
     
       <div className="overflow-x-auto border border-teal-200 rounded-lg shadow bg-emerald-50 p-4">
         <table className="min-w-full border-collapse border border-teal-300">
@@ -81,11 +78,11 @@ export default async function ResearchTable({ researchQuery }: Props) {
       </div>
 
       {/* Sources */}
-     {data.sources && data.sources?.length > 0 && (
+     {sources && sources?.length > 0 && (
   <div>
     <h3 className="text-lg font-medium text-teal-800">Sources</h3>
     <ul className="list-disc ml-6 text-sm text-teal-700">
-      {uniqueTableSources(data.sources).map((s, i) => (
+      {uniqueTableSources(sources).map((s, i) => (
         <li key={i}>
           <a
             href={s.sourceUrl}
@@ -93,7 +90,7 @@ export default async function ResearchTable({ researchQuery }: Props) {
             rel="noopener noreferrer"
             className="underline hover:text-teal-900"
           >
-            {s.metadata?.title || s.sourceUrl}
+            {s.title || s.sourceUrl}
           </a>
         </li>
       ))}

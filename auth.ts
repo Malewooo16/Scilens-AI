@@ -1,69 +1,95 @@
-import NextAuth from "next-auth"
-import type { NextAuthConfig } from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
-import { prisma } from "./db/prisma"
+
+import NextAuth from "next-auth";
+import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
+import { prisma } from "@/db/prisma";
+import { PrismaAdapter } from "@auth/prisma-adapter";
 
 
 
-export const config = {
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  adapter: PrismaAdapter(prisma),
   providers: [
-    CredentialsProvider({
-      name: "Credentials",
+    Google({}),
+    Credentials({
+      id: "credentials",
+      name: "credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: { label: "email", type: "text" },
+        password: { label: "password", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials.password) {
-          return null
+        // The `credentials` object needs to be explicitly typed to ensure `email` and `password` exist.
+        const typedCredentials = credentials as Record<string, string | undefined>;
+        const email = typedCredentials.email;
+        const password = typedCredentials.password;
+
+        if (!email || !password) {
+          return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        })
+        const existingUser = await prisma.user.findUnique({
+          where: {
+            email: email,
+          },
+        });
 
-        if (!user) {
-          return null
+        if (!existingUser || !existingUser.password) {
+          throw new Error("Invalid credentials");
         }
 
-        const isValidPassword = (
-          credentials.password === user.password
-        )
-
-        if (!isValidPassword) {
-          return null
+        const passwordMatch = password === existingUser.password;
+        if (!passwordMatch) {
+          throw new Error("Invalid credentials");
         }
 
-        return { id: user.id, email: user.email, name: user.name, role: user.role }
+        // Return a user object with the required properties.
+        return {
+          id: existingUser.id,
+          email: existingUser.email,
+          name: existingUser.name,
+        };
       },
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider !== "credentials") return true;
+      const existingUser = await prisma.user.findUnique({
+        where: {
+          id: user.id,
+        },
+      });
+
+      // It's good practice to handle cases where the user might not be found.
+      if (!existingUser) return false;
+
+      // You can implement email verification checks here if needed.
+      // e.g., if (!existingUser.emailVerified) return false;
+
+      return true;
+    },
     async jwt({ token, user }) {
+      // The `user` object is only present on the first sign-in, so we check if it exists.
       if (user) {
-        token.id = user.id
-        // @ts-ignore
-        token.role = user.role
+        token.id = user.id;
       }
-      return token
+      return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        // @ts-ignore
-        session.user.id = token.id as string
-        // @ts-ignore
-        session.user.role = token.role as string
+      // Ensure the `session.user` and `token` are properly handled.
+      if (session.user && token.id) {
+        // Here, we cast the token.id to a string to ensure consistency.
+        session.user.id = String(token.id);
       }
-      return session
+      return session;
     },
   },
   pages: {
-    signIn: "/auth/login",
+    signOut: "/",
   },
   session: {
     strategy: "jwt",
   },
-secret: process.env.AUTH_SECRET
-} satisfies NextAuthConfig
-
-export const { handlers, signIn, signOut, auth } = NextAuth(config)
+});

@@ -7,6 +7,8 @@ import ResearchTable from "@/components/Research/ResearchTable";
 import ReportView from "@/components/Research/ReportView";
 import KnowledgeGraph from "@/components/Research/KnowledgeGraph";
 import Visualizations from "@/components/Research/Visualizations";
+import GapsView from "@/components/Research/GapsView";
+import DownloadButton from "@/components/Research/DownloadButton";
 
 const Tabs = ({ view, id }: { view: string; id: string }) => {
   const activeView = view || "report";
@@ -17,11 +19,12 @@ const Tabs = ({ view, id }: { view: string; id: string }) => {
     { key: "chat", label: "Chat" },
     { key: "graph", label: "Knowledge Graph" },
     { key: "visualizations", label: "Visualizations" },
+    { key: "gaps", label: "Gaps & Limitations" },
   ];
 
   return (
     <div className="mb-6 border-b border-gray-200">
-      <div className="flex gap-6">
+      <div className="flex flex-wrap gap-3 sm:gap-6">
         {tabs.map((tab) => {
           const isActive = activeView === tab.key;
           return (
@@ -68,18 +71,18 @@ export default async function ResearchPage({
   const activeView = view || "report";
 
   return (
-    <div className="p-6 w-full mx-auto">
-     {activeView === "chat" && ( <h1 className="text-3xl font-bold text-center text-teal-900 mb-8">
-        Research Report
-      </h1>)}
+    <div className="p-4 sm:p-6 w-full mx-auto md:max-w-3xl lg:max-w-5xl">
+      <div className="flex flex-row-reverse justify-between items-center mb-8">
+        
+        <DownloadButton researchQueryId={researchQuery.id} />
+         <h1 className="text-3xl font-bold text-teal-900">
+        Research Report for {researchQuery.enhancedQuery}
+      </h1>
+      </div>
 
-      {/* Enhanced Query */}
-    {activeView === "chat" && (  <div className="bg-white/70 shadow-sm border border-gray-200 rounded-xl p-6 mb-6">
-        <h2 className="text-xl font-semibold text-teal-700 mb-2">
-          Research Topic
-        </h2>
-        <p className="text-gray-700">{researchQuery?.enhancedQuery}</p>
-      </div>)}
+     
+
+   
 
       {/* Tabs */}
       <Tabs view={activeView as string} id={id} />
@@ -88,11 +91,12 @@ export default async function ResearchPage({
       <div className="mt-6">
         {activeView === "report" && <ReportView researchQueryId={id} />}
         {activeView === "tables" && (
-          <ResearchTable researchQuery={researchQuery?.enhancedQuery as string} />
+          <ResearchTable researchQueryId={id} />
         )}
         {activeView === "chat" && <Chat />}
         {activeView === "graph" && <KnowledgeGraph researchQueryId={id} initialGraphData={researchQuery?.knowledgeGraph} />}
-        {activeView === "visualizations" && <Visualizations researchQueryId={id} initialVisualizations={researchQuery?.visualizations} researchQuery={researchQuery?.enhancedQuery as string} />}
+        {activeView === "visualizations" && <Visualizations researchQueryId={id} initialVisualizations={researchQuery?.visualizations} />}
+        {activeView === "gaps" && <GapsView researchQueryId={id} />}
       </div>
     </div>
   );

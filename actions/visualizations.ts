@@ -91,7 +91,7 @@ export async function generateVisualizations(report: string, query: string) {
   `;
 
   const vizResp = await genAI.models.generateContent({
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-2.5-flash",
     contents: prompt,
   });
 
@@ -116,8 +116,7 @@ export async function generateVisualizations(report: string, query: string) {
  * Main pipeline: extract keywords -> fetch report per keyword -> generate visualizations -> store in DB.
  */
 export async function generateAndStoreVisualizations(
-  researchQueryId: string,
-  query: string
+  researchQueryId: string
 ) {
   const researchQuery = await prisma.researchQuery.findUnique({
     where: { id: researchQueryId },
@@ -128,24 +127,10 @@ export async function generateAndStoreVisualizations(
     throw new Error("Research query not found");
   }
 
-  // Step 1: Extract keywords
-  const keywords = await generateKeywords(query);
+  const report = researchQuery.documents.map(doc => doc.content).join("\n\n");
 
-  // Step 2: Query chatbot per keyword (parallelized for efficiency)
-  const keywordReports = await Promise.all(
-    keywords.map(async (kw) => {
-      const resp = await chatBot(kw);
-      return resp.answer as string;
-    })
-  );
+  const visualizations = await generateVisualizations(report, researchQuery.enhancedQuery as string);
 
-  // Step 3: Merge reports for broader coverage
-  const mergedReport = keywordReports.join("\n\n");
-
-  // Step 4: Generate visualizations from merged report
-  const visualizations = await generateVisualizations(mergedReport, query);
-
-  // Step 5: Store in DB
   await prisma.researchQuery.update({
     where: { id: researchQueryId },
     data: { visualizations: visualizations as any },

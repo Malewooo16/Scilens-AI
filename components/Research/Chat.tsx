@@ -59,7 +59,7 @@ const uniqueSources = (sources?: any[]) => {
   }, [messages, isPending]);
 
   return (
-    <div className="w-full mx-auto p-4 flex flex-col h-[90vh]">
+    <div className="w-full mx-auto p-4 flex flex-col h-[calc(100vh-100px)] md:h-[calc(100vh-150px)] lg:h-[calc(100vh-200px)] md:max-w-3xl lg:max-w-4xl">
       {/* Chat window */}
       <div className="flex-1 overflow-y-auto border rounded-lg p-4 bg-emerald-50 shadow space-y-4">
         {messages.map((msg, i) => (

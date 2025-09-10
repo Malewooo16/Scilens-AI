@@ -12,7 +12,7 @@ import { generateEmbedding } from "..";
 
 const genAI = new GoogleGenAI({apiKey: process.env.GOOGLE_API_KEY!});
 
-export async function searchDocs(query: string, topK = 5) {
+export async function searchDocs(query: string, topK = 20) {
 //  console.log("Searching for:", query);
   // 1️⃣ Create query embedding for semantic search
   const embedding = await generateEmbedding(query);
@@ -49,32 +49,38 @@ export async function searchDocs(query: string, topK = 5) {
  * @param searchResults Search results from vector search
  */
 export async function generateReport(query: string, searchResults: any[]) {
-  // ✅ Deduplicate results by sourceUrl
-  const uniqueResultsMap = new Map<string, any>();
+  // ✅ Group results by sourceUrl
+  const groupedResults = new Map<string, { title: string; url: string; snippets: string[] }>();
 
   for (const r of searchResults) {
-    if (!uniqueResultsMap.has(r.sourceUrl)) {
-      uniqueResultsMap.set(r.sourceUrl, {
+    if (!groupedResults.has(r.sourceUrl)) {
+      groupedResults.set(r.sourceUrl, {
         title: r.metadata?.title || r.docTitle || "Untitled Source",
         url: r.sourceUrl,
+        snippets: [r.textSnippet],
       });
+    } else {
+      // avoid duplicate snippet text from the same source
+      const group = groupedResults.get(r.sourceUrl)!;
+      if (!group.snippets.includes(r.textSnippet)) {
+        group.snippets.push(r.textSnippet);
+      }
     }
   }
 
-  const uniqueReferences = Array.from(uniqueResultsMap.values()).map(
-    (ref, idx) => ({
-      id: idx + 1,
-      title: ref.title,
-      url: ref.url,
-    })
-  );
+  // ✅ Build unique references
+  const uniqueReferences = Array.from(groupedResults.values()).map((ref, idx) => ({
+    id: idx + 1,
+    title: ref.title,
+    url: ref.url,
+  }));
 
-  // ✅ Build context string using textSnippets (even duplicates allowed)
-  const context = searchResults
-    .map(
-      (r: any, i: number) =>
-        `Source ${i + 1}:\n${r.textSnippet}\nSource URL: ${r.sourceUrl}\n`
-    )
+  // ✅ Build context using grouped snippets per source
+  const context = Array.from(groupedResults.entries())
+    .map(([_, group], i) => {
+      const snippetsJoined = group.snippets.join("\n---\n");
+      return `Source ${i + 1}:\n${snippetsJoined}\nSource URL: ${group.url}\n`;
+    })
     .join("\n\n");
 
   const prompt = `
@@ -128,4 +134,5 @@ If there are no relevant search results, return null.
 
   return parsed;
 }
+
 

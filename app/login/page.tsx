@@ -1,21 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { FcGoogle } from "react-icons/fc";
+import {useState} from "react";
+import {FcGoogle} from "react-icons/fc";
+import {signIn} from "next-auth/react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleGoogleLogin = () => {
-    // Trigger your Google auth logic here
-    console.log("Google login triggered");
+    // Use Auth.js to trigger Google sign-in
+    signIn("google", {redirectTo: "/"});
   };
 
   const handleCredLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle credentials login logic here
-    console.log("Email:", email, "Password:", password);
+    // Use Auth.js to trigger credentials sign-in
+    signIn("credentials", {
+      email,
+      password,
+      redirectTo: "/new",
+    });
   };
 
   return (
@@ -86,7 +91,10 @@ export default function LoginPage() {
         {/* Footer */}
         <p className="text-center text-sm text-gray-600 mt-6">
           Don’t have an account?{" "}
-          <a href="/signup" className="text-teal-700 font-semibold hover:underline">
+          <a
+            href="/signup"
+            className="text-teal-700 font-semibold hover:underline"
+          >
             Sign up
           </a>
         </p>

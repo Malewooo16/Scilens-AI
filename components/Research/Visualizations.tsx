@@ -6,25 +6,24 @@ import { generateAndStoreVisualizations } from '@/actions/visualizations';
 interface VisualizationsProps {
   researchQueryId: string;
   initialVisualizations: any;
-  researchQuery: string;
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
-const Visualizations: React.FC<VisualizationsProps> = ({ researchQueryId, initialVisualizations, researchQuery }) => {
+const Visualizations: React.FC<VisualizationsProps> = ({ researchQueryId, initialVisualizations }) => {
   const [visualizations, setVisualizations] = useState(initialVisualizations?.visualizations || []);
   const [loading, setLoading] = useState(false);
 
   const handleGenerateVisualizations = useCallback(async () => {
     setLoading(true);
     try {
-      const vizData = await generateAndStoreVisualizations(researchQueryId, researchQuery);
+      const vizData = await generateAndStoreVisualizations(researchQueryId);
       setVisualizations(vizData.visualizations);
     } catch (error) {
       console.error('Failed to generate visualizations:', error);
     }
     setLoading(false);
-  }, [researchQueryId, researchQuery]);
+  }, [researchQueryId]);
 
   useEffect(() => {
     if (!initialVisualizations) {
@@ -36,7 +35,7 @@ const Visualizations: React.FC<VisualizationsProps> = ({ researchQueryId, initia
     switch (viz.type) {
       case 'bar':
         return (
-          <ResponsiveContainer width="100%" height={300} key={index}>
+          <ResponsiveContainer width="100%" height={250}  key={index}>
             <BarChart data={viz.data}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name"  className='w-1/2'/>
@@ -49,7 +48,7 @@ const Visualizations: React.FC<VisualizationsProps> = ({ researchQueryId, initia
         );
       case 'pie':
         return (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie data={viz.data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} fill="#8884d8" label>
                 {viz.data.map((entry: any, idx: number) => (
@@ -63,7 +62,7 @@ const Visualizations: React.FC<VisualizationsProps> = ({ researchQueryId, initia
         );
         case 'line':
             return (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={350}>
                 <LineChart data={viz.data}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />

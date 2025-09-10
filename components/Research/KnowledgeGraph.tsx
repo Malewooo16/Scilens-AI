@@ -101,7 +101,7 @@ const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ researchQueryId, initia
       >
         {loading ? 'Generating...' : 'Regenerate Knowledge Graph'}
       </button>
-      <div className="h-[500px] border border-gray-300 rounded-xl shadow-sm">
+      <div className="h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] border border-gray-300 rounded-xl shadow-sm">
         <ReactFlow
           nodes={nodes}
           edges={edges}

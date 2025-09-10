@@ -8,7 +8,7 @@ export default function RootLayout({
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-teal-400 via-teal-300 to-emerald-200">
       <Sidebar />
-      <main className="flex-1 p-8">{children}</main>
+      <main className="flex-1 p-4 sm:p-8 ">{children}</main>
     </div>
   );
 }

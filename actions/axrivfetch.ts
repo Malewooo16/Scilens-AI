@@ -1,3 +1,58 @@
+import { parseStringPromise } from "xml2js";
+
+interface ArxivPaper {
+  pdfUrl: any;
+  title: string;
+  pdfBuffer: Buffer | null;
+  metadata: {
+    title: string;
+    authors: string[];
+    published: string | null;
+    updated: string | null;
+    doi: string | null;
+    journalRef: string | null;
+    comments: string | null;
+    categories: string[];
+  };
+  sourceUrl: string;
+}
+
+interface ArxivLink {
+  $: {
+    title?: string;
+    href: string;
+  };
+}
+
+interface ArxivAuthor {
+  name: string;
+}
+
+interface ArxivCategory {
+  $: {
+    term: string;
+  };
+}
+
+interface ArxivEntry {
+  title?: { _: string };
+  id: string;
+  author: ArxivAuthor | ArxivAuthor[];
+  link?: ArxivLink | ArxivLink[];
+  published?: string;
+  updated?: string;
+  "arxiv:doi"?: { _: string };
+  "arxiv:journal_ref"?: { _: string };
+  "arxiv:comment"?: { _: string };
+  category?: ArxivCategory | ArxivCategory[];
+}
+
+interface ArxivFeed {
+  feed: {
+    entry?: ArxivEntry | ArxivEntry[];
+  };
+}
+
 async function fetchPdfBuffer(pdfUrl: string): Promise<Buffer | null> {
   try {
     const resp = await fetch(pdfUrl);
@@ -10,13 +65,6 @@ async function fetchPdfBuffer(pdfUrl: string): Promise<Buffer | null> {
   }
 }
 
-interface ArxivPaper {
-  title: string;
-  pdfBuffer: Buffer | null;
-  metadata: Record<string, any>;
-  sourceUrl: string;
-}
-
 export async function fetchArxivPapers(
   keywords: string,
   minPapers = 4
@@ -25,67 +73,97 @@ export async function fetchArxivPapers(
     .split(" ")
     .map((k) => `"${k}"`)
     .join("+AND+");
-  const maxResults = 20; // large enough to get at least minPapers
+  const maxResults = 4;
 
   const url = `http://export.arxiv.org/api/query?search_query=all:${formattedKeywords}&max_results=${maxResults}&sortBy=relevance`;
 
   try {
     const resp = await fetch(url);
     const text = await resp.text();
-    const entries = [...text.matchAll(/<entry>([\s\S]*?)<\/entry>/g)];
+
+    const parsed = (await parseStringPromise(text, {
+      explicitArray: false,
+    })) as ArxivFeed;
+
+    let entries = parsed.feed.entry;
+
+    if (!entries) {
+      console.warn(`No papers found for "${keywords}"`);
+      return [];
+    }
+
+    if (!Array.isArray(entries)) entries = [entries];
 
     if (entries.length < minPapers) {
       console.warn(`Only found ${entries.length} papers for "${keywords}"`);
     }
+    console.log(`Found ${entries.length} papers for "${keywords}"`);
 
-    // Map entries to metadata first
-    const papersMetadata = entries.slice(0, minPapers).map((entryMatch) => {
-      const entryText = entryMatch[1];
+    const results: ArxivPaper[] = [];
 
-      const getTag = (tag: string) => {
-        const m = entryText.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`));
-        return m ? m[1].trim() : null;
-      };
+    for (const entry of entries) {
+      let title = "Untitled Paper";
+      if (entry.title && typeof entry.title === 'string') {
+        title = (entry.title as string).trim();
+      } else if (entry.title && typeof entry.title._ === 'string') {
+        title = entry.title._.trim();
+      }
 
-      const getMultipleTags = (tag: string) => {
-        const matches = [
-          ...entryText.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "g")),
-        ];
-        return matches.map((m) => m[1].trim());
-      };
+      const authors = Array.isArray(entry.author)
+        ? entry.author.map((a) => a.name)
+        : entry.author
+        ? [entry.author.name]
+        : [];
 
-      const title = getTag("title") || "Untitled Paper";
-      const authors = getMultipleTags("name");
-      const arxivIdMatch = entryText.match(/<id>(.*?)<\/id>/);
-      const sourceUrl = arxivIdMatch ? arxivIdMatch[1].trim() : "";
+      const sourceUrl = entry.id;
 
-      const pdfMatch = entryText.match(
-        /<link[^>]+title="pdf"[^>]+href="([^"]+)"/
-      );
-      const pdfUrl = pdfMatch ? pdfMatch[1] : null;
+      // Find PDF link
+      let pdfUrl: string | null = null;
+      if (entry.link) {
+        const links = Array.isArray(entry.link) ? entry.link : [entry.link];
+        const pdfLink = links.find((l) => l.$.title === "pdf");
+        pdfUrl = pdfLink?.$.href ?? null;
+      }
+
+      const categories = entry.category
+        ? Array.isArray(entry.category)
+          ? entry.category.map((c) => c.$.term)
+          : [entry.category.$.term]
+        : [];
 
       const metadata = {
         title,
         authors,
-        published: getTag("published"),
-        updated: getTag("updated"),
-        doi: getTag("arxiv:doi"),
-        journalRef: getTag("arxiv:journal_ref"),
-        categories: getMultipleTags("category").map((c) => {
-          const termMatch = c.match(/term="([^"]+)"/);
-          return termMatch ? termMatch[1] : c;
-        }),
-        comments: getTag("arxiv:comment"),
+        published: entry.published ?? null,
+        updated: entry.updated ?? null,
+        doi: entry["arxiv:doi"]?._ ?? null,
+        journalRef: entry["arxiv:journal_ref"]?._ ?? null,
+        comments: entry["arxiv:comment"]?._ ?? null,
+        categories,
       };
 
-      return { title, pdfUrl, metadata, sourceUrl };
-    });
+      if (pdfUrl) {
+        results.push({
+          title,
+          pdfBuffer: null,
+          metadata,
+          sourceUrl,
+          pdfUrl,
+        });
+      }
+    }
 
-    // Fetch PDFs in parallel
     const papers: ArxivPaper[] = await Promise.all(
-      papersMetadata.map(async ({ title, pdfUrl, metadata, sourceUrl }) => {
-        const pdfBuffer = pdfUrl ? await fetchPdfBuffer(pdfUrl) : null;
-        return { title, pdfBuffer, metadata, sourceUrl };
+      results.map(async (r) => {
+        const pdfBuffer = await fetchPdfBuffer(r.pdfUrl);
+        return {
+          title: r.title,
+          pdfUrl: r.pdfUrl,
+
+          pdfBuffer,
+          metadata: r.metadata,
+          sourceUrl: r.sourceUrl,
+        };
       })
     );
 

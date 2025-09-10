@@ -72,7 +72,7 @@ ${JSON.stringify(uniqueReferences, null, 2)}
   `;
 
   const keywordResp = await genAI.models.generateContent({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     contents: prompt,
   });
 

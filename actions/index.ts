@@ -80,28 +80,70 @@ function createChunks(text: string, maxChars = 2000) {
   return chunks;
 }
 
-/** Generate embedding using Gemini */
+/** Generate embedding using Jina AI */
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (!text.trim()) return [];
 
-  const response = await genAI.models.embedContent({
-    model: "gemini-embedding-001", // Gemini embedding model
-    contents: [text],
-    config:{
-      outputDimensionality: 1536, // Set to 1536 for Gemini
-    }
+  console.log("Generating embedding for a chunk of text...");
+  const startTime = Date.now();
+
+  const https = require('https');
+
+  const data = JSON.stringify({
+    model: 'jina-embeddings-v4',
+    task: 'text-matching',
+    dimensions: 1536,
+    input: [text],
   });
 
-  //console.log("Generated embedding:", response.embeddings[0].values.length);
-  // The vector is in response.embedding.values
-  if (response.embeddings && response.embeddings[0]?.values) {
-    return response.embeddings[0].values;
-  }
-  return [];
+  const options = {
+    hostname: 'api.jina.ai',
+    path: '/v1/embeddings',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.JINA_API_KEY}`,
+    }
+  };
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res: any) => {
+      let responseData = '';
+      res.on('data', (chunk: any) => {
+        responseData += chunk;
+      });
+
+      res.on('end', () => {
+        const endTime = Date.now();
+        console.log(`Jina AI API call took ${endTime - startTime}ms`);
+        try {
+          const parsedData = JSON.parse(responseData);
+          if (parsedData.data && parsedData.data[0] && parsedData.data[0].embedding) {
+            resolve(parsedData.data[0].embedding);
+          } else {
+            reject(new Error('Invalid response from Jina AI API'));
+          }
+        } catch (error) { 
+          reject(error);
+        }
+      });
+    });
+
+    req.on('error', (error: any) => {
+      reject(error);
+    });
+
+    req.write(data);
+    req.end();
+  });
 }
 
 import pdfParse from "pdf-parse";
 import { fetchArxivPapers } from "./axrivfetch";
+import { summarizePapers } from "./summarize";
+import { generateTable } from "./generateTable";
+import { criticizePapers } from "./criticize";
+import { auth } from "@/auth";
 
 
 const nanoid = customAlphabet("1234567890abcdef", 10);
@@ -116,8 +158,11 @@ export async function processPDFs(
   researchQueryId: string,
   userId: string
 ) {
-  for (const paper of papers) {
-    if (!paper.pdfBuffer) continue;
+  console.log("Starting to process PDFs...");
+  const processingPromises = papers.map(async (paper, index) => {
+    if (!paper.pdfBuffer) return;
+
+    console.log(`Processing paper ${index + 1} of ${papers.length}: ${paper.title}`);
 
     try {
       // 1. Extract text from PDF
@@ -137,28 +182,46 @@ export async function processPDFs(
       });
 
       // 3. Split into chunks
+      console.log(`Splitting text into chunks for: ${paper.title}`);
       const chunks = createChunks(fullText, 2000);
-        for (let pos = 0; pos < chunks.length; pos++) {
-      const chunkText = chunks[pos];
-      const embeddingVector = await generateEmbedding(chunkText);
+      console.log(`Created ${chunks.length} chunks for: ${paper.title}`);
 
-      await prisma.$executeRawUnsafe(
-        `
-        INSERT INTO embedding (\`chunkText\`, \`embeddings\`, \`documentId\`, \`id\`)
+      // 4. Generate embeddings for all chunks in parallel
+      console.log(`Generating embeddings for ${chunks.length} chunks of: ${paper.title}`);
+      const embeddingPromises = chunks.map(async (chunkText) => {
+        const embeddingVector = await generateEmbedding(chunkText);
+        return {
+          chunkText,
+          embeddingVector,
+          documentId: document.id,
+        };
+      });
+
+      const embeddings = await Promise.all(embeddingPromises);
+      console.log(`Finished generating embeddings for: ${paper.title}`);
+
+      // 5. Insert all embeddings in a single transaction
+      console.log(`Inserting ${embeddings.length} embeddings into the database for: ${paper.title}`);
+      for (const embedding of embeddings) {
+        await prisma.$executeRawUnsafe(
+          `
+        INSERT INTO embedding (chunkText, embeddings, documentId, id)
         VALUES (?, ?, ?, ?);
         `,
-        chunkText,
-        `[${embeddingVector.join(",")}]`,
-        document.id,
-        nanoid()
-      );
-    }
-
+          embedding.chunkText,
+          `[${embedding.embeddingVector.join(",")}]`,
+          embedding.documentId,
+          nanoid()
+        );
+      }
+      console.log(`Finished inserting embeddings for: ${paper.title}`);
     } catch (err) {
       console.error("processPDFs error for", paper.title, err);
-      continue;
     }
-  }
+  });
+
+  await Promise.all(processingPromises);
+  console.log("Finished processing all PDFs.");
 }
 
 
@@ -168,10 +231,14 @@ export async function searchDocuments(formData: FormData) {
   const query = formData.get("query")?.toString().trim();
   if (!query) return redirect("/error");
 
+  console.log(`Starting search for query: "${query}"`);
+  const startTime = Date.now();
+
   let redirectPath: string | null = null;
 
   try {
     // Step 1: Extract keywords
+    console.log("Step 1: Extracting keywords...");
     const keywordResp = await genAI.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Extract 2 precise search keywords for this research topic: "${query}". Return as JSON array of strings.`,
@@ -180,8 +247,10 @@ export async function searchDocuments(formData: FormData) {
       (keywordResp.text ?? "").trim().replace(/```json|```/g, "")
     );
     const keywords = keywordsArray.join(" ");
+    console.log(`Keywords extracted: ${keywords}`);
 
     // Step 2: Generate enhanced research query
+    console.log("Step 2: Generating enhanced research query...");
     const enhancedResp = await genAI.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Given the research topic "${query}" and keywords ${keywordsArray.join(
@@ -189,28 +258,72 @@ export async function searchDocuments(formData: FormData) {
       )}, return an enhanced research query with proper focus and clear without unessary articles like "A comparative, The Study" return single sentence only.`,
     });
     const enhancedQuery = (enhancedResp.text ?? "").trim();
-
     console.log("Enhanced Query:", enhancedQuery);
+
+    const session = await auth();
     // Step 3: Create research query entry in DB
+    console.log("Step 3: Creating research query entry in DB...");
     const researchQuery = await prisma.researchQuery.create({
       data: {
         originalQuery: query,
         enhancedQuery,
-        userId: "cmf1cyaam0000sws0zf5fp9lm", // replace with session user ID
+        userId: session?.user?.id as string, // replace with session user ID
       },
     });
+    console.log(`Research query created with ID: ${researchQuery.id}`);
 
     // Step 4: Fetch papers from arXiv
+    console.log("Step 4: Fetching papers from arXiv...");
     const arxivPapers = await fetchArxivPapers(keywords);
+    console.log(`Fetched ${arxivPapers.length} papers from arXiv.`);
 
     // Step 5: Process PDFs and store chunks/embeddings
+    console.log("Step 5: Processing PDFs and storing chunks/embeddings...");
     await processPDFs(
       arxivPapers,
       researchQuery.id,
-      "cmf1cyaam0000sws0zf5fp9lm"
+      session?.user?.id as string
     );
+    console.log("Finished processing PDFs.");
 
-  
+    // Step 6: Summarize the papers
+    console.log("Step 6: Summarizing the papers...");
+    const documents = await prisma.document.findMany({
+      where: { researchQueryId: researchQuery.id },
+    });
+
+    const paperContents = documents.map(doc => ({ sourceUrl: doc.sourceUrl || '', content: doc.content }));
+
+    const summary = await summarizePapers(paperContents);
+
+    await prisma.researchQuery.update({
+      where: { id: researchQuery.id },
+      data: { summary },
+    });
+    console.log("Finished summarizing papers.");
+
+    // Step 7: Generate table from the papers
+    console.log("Step 7: Generating table from the papers...");
+    const table = await generateTable(paperContents);
+
+    await prisma.researchQuery.update({
+      where: { id: researchQuery.id },
+      data: { table },
+    });
+    console.log("Finished generating table.");
+
+    // Step 8: Criticize the papers
+    console.log("Step 8: Criticizing the papers...");
+    const gaps = await criticizePapers(paperContents);
+
+    await prisma.researchQuery.update({
+      where: { id: researchQuery.id },
+      data: { gaps },
+    });
+    console.log("Finished criticizing papers.");
+
+    const endTime = Date.now();
+    console.log(`Total search process took ${endTime - startTime}ms`);
 
     redirectPath = `/results/${researchQuery.id}`;
   } catch (err) {
