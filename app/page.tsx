@@ -3,6 +3,7 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, BookOpen, Search, FileText, Sparkles, CheckCircle2 } from "lucide-react";
+import SignupForm from "@/components/SignupForm";
 
 export default function LandingPage() {
   return (
@@ -271,7 +272,7 @@ function CTA() {
             </p>
             <div className="mt-6 flex gap-4">
               <a 
-                href="/new-query" 
+                href="/new" 
                 className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl shadow-lg transition"
               >
                 Try it Free <ArrowRight className="w-4 h-4" />
@@ -308,6 +309,7 @@ function CTA() {
             </ul>
           </motion.div>
         </div>
+        
       </div>
     </section>
   );

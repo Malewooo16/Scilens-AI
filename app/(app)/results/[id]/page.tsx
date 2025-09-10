@@ -49,6 +49,8 @@ const Tabs = ({ view, id }: { view: string; id: string }) => {
   );
 };
 
+import { searchDocumentsOnDemand } from "@/actions/index";
+
 export default async function ResearchPage({
   params,
   searchParams,
@@ -61,22 +63,38 @@ export default async function ResearchPage({
 
   if (!id) return redirect("/error");
 
-  const researchQuery = await prisma.researchQuery.findUnique({
+  let researchQuery = await prisma.researchQuery.findUnique({
     where: { id: id },
     include: { documents: true },
   });
 
-  if (!researchQuery) return redirect("/new");
+  if (!researchQuery) {return redirect("/new");}
 
   const activeView = view || "report";
+
+  if (activeView === 'tables' && !researchQuery.table) {
+    await searchDocumentsOnDemand(id, 'table');
+    researchQuery = await prisma.researchQuery.findUnique({
+      where: { id: id },
+      include: { documents: true },
+    });
+  }
+
+  if (activeView === 'gaps' && !researchQuery?.gaps) {
+    await searchDocumentsOnDemand(id, 'gaps');
+    researchQuery = await prisma.researchQuery.findUnique({
+      where: { id: id },
+      include: { documents: true },
+    });
+  }
 
   return (
     <div className="p-4 sm:p-6 w-full mx-auto md:max-w-3xl lg:max-w-5xl">
       <div className="flex flex-row-reverse justify-between items-center mb-8">
         
-        <DownloadButton researchQueryId={researchQuery.id} />
+        <DownloadButton researchQueryId={researchQuery?.id as string} />
          <h1 className="text-3xl font-bold text-teal-900">
-        Research Report for {researchQuery.enhancedQuery}
+        Research Report for {researchQuery?.enhancedQuery}
       </h1>
       </div>
 

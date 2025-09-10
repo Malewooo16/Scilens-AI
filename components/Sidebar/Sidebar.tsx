@@ -6,7 +6,7 @@ import { auth } from "@/auth";
 
 export default async function Sidebar() {
   const session = await auth();
-  //console.log(session?.user)
+//  console.log(session?.user)
   const chats = await prisma.researchQuery.findMany({
     where:{
        userId: session?.user?.id

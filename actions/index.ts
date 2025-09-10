@@ -202,18 +202,20 @@ export async function processPDFs(
 
       // 5. Insert all embeddings in a single transaction
       console.log(`Inserting ${embeddings.length} embeddings into the database for: ${paper.title}`);
-      for (const embedding of embeddings) {
-        await prisma.$executeRawUnsafe(
-          `
+      
+      const embeddingInserts = embeddings.map(embedding => prisma.$executeRawUnsafe(
+        `
         INSERT INTO embedding (chunkText, embeddings, documentId, id)
         VALUES (?, ?, ?, ?);
         `,
-          embedding.chunkText,
-          `[${embedding.embeddingVector.join(",")}]`,
-          embedding.documentId,
-          nanoid()
-        );
-      }
+        embedding.chunkText,
+        `[${embedding.embeddingVector.join(",")}]`,
+        embedding.documentId,
+        nanoid()
+      ));
+
+      await prisma.$transaction(embeddingInserts);
+
       console.log(`Finished inserting embeddings for: ${paper.title}`);
     } catch (err) {
       console.error("processPDFs error for", paper.title, err);
@@ -225,7 +227,36 @@ export async function processPDFs(
 }
 
 
+
+export async function searchDocumentsOnDemand(researchQueryId: string, tab: 'table' | 'gaps' | 'visualizations') {
+  console.log(`Handling on-demand request for research query ${researchQueryId}, tab: ${tab}`);
+
+  const documents = await prisma.document.findMany({
+    where: { researchQueryId: researchQueryId },
+  });
+
+  const paperContents = documents.map(doc => ({ sourceUrl: doc.sourceUrl || '', content: doc.content }));
+
+  if (tab === 'table') {
+    console.log("Generating table from the papers...");
+    const table = await generateTable(paperContents);
+    await prisma.researchQuery.update({
+      where: { id: researchQueryId },
+      data: { table },
+    });
+    console.log("Finished generating table.");
+  } else if (tab === 'gaps') {
+    console.log("Criticizing the papers...");
+    const gaps = await criticizePapers(paperContents);
+    await prisma.researchQuery.update({
+      where: { id: researchQueryId },
+      data: { gaps },
+    });
+    console.log("Finished criticizing papers.");
+  }
+}
 // ---------------------- Main Server Action ----------------------
+
 
 export async function searchDocuments(formData: FormData) {
   const query = formData.get("query")?.toString().trim();
@@ -301,26 +332,6 @@ export async function searchDocuments(formData: FormData) {
       data: { summary },
     });
     console.log("Finished summarizing papers.");
-
-    // Step 7: Generate table from the papers
-    console.log("Step 7: Generating table from the papers...");
-    const table = await generateTable(paperContents);
-
-    await prisma.researchQuery.update({
-      where: { id: researchQuery.id },
-      data: { table },
-    });
-    console.log("Finished generating table.");
-
-    // Step 8: Criticize the papers
-    console.log("Step 8: Criticizing the papers...");
-    const gaps = await criticizePapers(paperContents);
-
-    await prisma.researchQuery.update({
-      where: { id: researchQuery.id },
-      data: { gaps },
-    });
-    console.log("Finished criticizing papers.");
 
     const endTime = Date.now();
     console.log(`Total search process took ${endTime - startTime}ms`);

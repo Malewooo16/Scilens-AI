@@ -21,7 +21,12 @@ export default async function ResearchTable({ researchQueryId }: Props) {
   });
 
   if (!researchQuery?.table) {
-    return <p className="text-teal-700">No table available for this research query.</p>;
+    return <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <p className="text-lg font-semibold text-teal-800">Generating Table...</p>
+        <p className="text-gray-600">This may take a moment. Please wait.</p>
+      </div>
+    </div>;
   }
 
   const tableString = researchQuery.table;

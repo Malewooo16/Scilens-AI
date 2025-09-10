@@ -35,7 +35,12 @@ const GapsView = async ({researchQueryId}: {researchQueryId: string}) => {
   });
 
   if (!researchQuery?.gaps) {
-    return <div>No gaps and limitations analysis available.</div>;
+    return <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <p className="text-lg font-semibold text-teal-800">Generating Gaps and Limitations Analysis...</p>
+        <p className="text-gray-600">This may take a moment. Please wait.</p>
+      </div>
+    </div>;
   }
 
   return (

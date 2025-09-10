@@ -5,7 +5,7 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth
 
   // Paths that don't require auth
-  const publicPaths = ["/", "/login", "/signup"]
+  const publicPaths = ["/", "/login", "/signup", "/verify:path*"]
 
   // 🚫 Not logged in, trying to access a protected route
   if (!isLoggedIn && !publicPaths.includes(pathname)) {
@@ -31,5 +31,6 @@ export const config = {
     // Also apply middleware on login & signup for redirect logic
     "/login",
     "/signup",
+    "/verify:path*",
   ],
 }

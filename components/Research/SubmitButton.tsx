@@ -17,8 +17,8 @@ export default function SubmitButton() {
     >
       {pending ? (
         <div className="flex items-center space-x-2">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <LoadingMessages />
+          <Loader2 className="h-5 w-5 mr-4 animate-spin" />
+          Searching Papers
         </div>
       ) : (
         "Search Papers"

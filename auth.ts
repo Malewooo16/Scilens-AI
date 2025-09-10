@@ -20,8 +20,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "password", type: "text" },
       },
       async authorize(credentials) {
-        // The `credentials` object needs to be explicitly typed to ensure `email` and `password` exist.
-        const typedCredentials = credentials as Record<string, string | undefined>;
+        const typedCredentials = credentials as Record<string, any>;
+
         const email = typedCredentials.email;
         const password = typedCredentials.password;
 
@@ -44,7 +44,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           throw new Error("Invalid credentials");
         }
 
-        // Return a user object with the required properties.
+        if (!existingUser.emailVerified) {
+          throw new Error("Email not verified. Please check your inbox for a verification link.");
+        }
+
         return {
           id: existingUser.id,
           email: existingUser.email,
@@ -52,9 +55,45 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         };
       },
     }),
+    Credentials({
+      id: "token-login",
+      name: "Token Login",
+      credentials: {
+        token: { label: "Token", type: "text" },
+      },
+      async authorize(credentials) {
+        const typedCredentials = credentials as Record<string, any>;
+        const token = typedCredentials.token;
+
+        if (!token) {
+          return null;
+        }
+
+        const user = await prisma.user.findFirst({
+          where: {
+            verificationToken: token,
+          },
+        });
+
+        if (user && user.emailVerified) {
+          // Clear the token after successful login
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { verificationToken: null },
+          });
+          return user; // Return user if verified
+        }
+        return null; // Not verified or user not found
+      },
+    }),
   ],
   callbacks: {
     async signIn({ user, account }) {
+      // Allow token-login provider to sign in directly
+      if (account?.provider === "token-login") {
+        return true;
+      }
+      // Existing credentials provider logic
       if (account?.provider !== "credentials") return true;
       const existingUser = await prisma.user.findUnique({
         where: {
@@ -62,25 +101,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         },
       });
 
-      // It's good practice to handle cases where the user might not be found.
       if (!existingUser) return false;
-
-      // You can implement email verification checks here if needed.
-      // e.g., if (!existingUser.emailVerified) return false;
 
       return true;
     },
     async jwt({ token, user }) {
-      // The `user` object is only present on the first sign-in, so we check if it exists.
       if (user) {
         token.id = user.id;
       }
       return token;
     },
     async session({ session, token }) {
-      // Ensure the `session.user` and `token` are properly handled.
       if (session.user && token.id) {
-        // Here, we cast the token.id to a string to ensure consistency.
         session.user.id = String(token.id);
       }
       return session;
