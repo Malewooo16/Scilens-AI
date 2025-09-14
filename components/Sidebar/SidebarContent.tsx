@@ -58,11 +58,11 @@ export default function SidebarContent({ chats }: { chats: ResearchQuery[] }) {
 
       <aside
         className={`
-          fixed inset-y-0 left-0 z-40 flex flex-col
+          sticky inset-y-0 left-0 z-40 flex flex-col
           bg-gradient-to-b from-teal-700 via-teal-600 to-teal-800 text-white
           h-screen shadow-lg transition-transform duration-300 ease-in-out
           ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
-          md:relative md:translate-x-0 md:flex
+          md:translate-x-0 md:flex
           ${collapsed ? "md:w-20" : "md:w-64"}
         `}
       >

@@ -6,9 +6,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-teal-400 via-teal-300 to-emerald-200">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-teal-400 via-teal-300 to-emerald-200">
       <Sidebar />
-      <main className="flex-1 p-4 sm:p-8 ">{children}</main>
+      <main className="flex-1 p-4 sm:p-8 overflow-y-auto">{children}</main>
     </div>
   );
 }
