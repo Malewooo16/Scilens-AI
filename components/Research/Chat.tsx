@@ -3,6 +3,7 @@
 import { chatBot } from "@/actions/chat";
 import { useActionState } from "react";
 import { useState, useRef, useEffect } from "react";
+import FormattedSummary from "./Formatted";
 
 type Message = {
   role: "user" | "assistant";
@@ -71,7 +72,7 @@ const uniqueSources = (sources?: any[]) => {
                 : "bg-emerald-100 text-emerald-900"
             }`}
           >
-            <p>{msg.content}</p>
+           <FormattedSummary text={msg.content} />
           {msg.sources && msg.sources.length > 0 && (
   <div className="mt-2 text-xs text-emerald-700">
     Sources:

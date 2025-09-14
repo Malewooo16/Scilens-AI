@@ -30,7 +30,7 @@ ${paper.content}
       `;
 
       const response = await genAI.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite",
         contents: prompt,
       });
 
@@ -56,7 +56,7 @@ ${combinedCriticism}
   `;
 
   const finalResponse = await genAI.models.generateContent({
-    model: "gemini-2.5-pro",
+    model: "gemini-2.5-flash-lite",
     contents: finalPrompt,
   });
 

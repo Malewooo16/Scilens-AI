@@ -4,12 +4,14 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { PromptTemplate } from "@langchain/core/prompts";
 
 const llm = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash", // or "gemini-1.5-flash"
+  model: "gemini-2.5-flash-lite", // or "gemini-1.5-flash"
 });
 
 export async function chatBot(query: string) {
   // 1. Get relevant documents
   const results = await searchDocs(query);
+
+ // console.log("Search Results:", results);
 
   // 2. Build the context from retrieved results
  // Deduplicate results by sourceUrl

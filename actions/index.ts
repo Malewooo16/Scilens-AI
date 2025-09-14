@@ -80,62 +80,26 @@ function createChunks(text: string, maxChars = 2000) {
   return chunks;
 }
 
-/** Generate embedding using Jina AI */
+/** Generate embedding using Gemini */
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (!text.trim()) return [];
 
-  console.log("Generating embedding for a chunk of text...");
-  const startTime = Date.now();
-
-  const https = require('https');
-
-  const data = JSON.stringify({
-    model: 'jina-embeddings-v4',
-    task: 'text-matching',
-    dimensions: 1536,
-    input: [text],
-  });
-
-  const options = {
-    hostname: 'api.jina.ai',
-    path: '/v1/embeddings',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.JINA_API_KEY}`,
+  const response = await genAI.models.embedContent({
+    model: "gemini-embedding-001", // Gemini embedding model
+    contents: [text],
+    config:{
+      outputDimensionality: 1536, // Set to 1536 for Gemini
     }
-  };
-
-  return new Promise((resolve, reject) => {
-    const req = https.request(options, (res: any) => {
-      let responseData = '';
-      res.on('data', (chunk: any) => {
-        responseData += chunk;
-      });
-
-      res.on('end', () => {
-        const endTime = Date.now();
-        console.log(`Jina AI API call took ${endTime - startTime}ms`);
-        try {
-          const parsedData = JSON.parse(responseData);
-          if (parsedData.data && parsedData.data[0] && parsedData.data[0].embedding) {
-            resolve(parsedData.data[0].embedding);
-          } else {
-            reject(new Error('Invalid response from Jina AI API'));
-          }
-        } catch (error) { 
-          reject(error);
-        }
-      });
-    });
-
-    req.on('error', (error: any) => {
-      reject(error);
-    });
-
-    req.write(data);
-    req.end();
   });
+
+  if (response.embeddings && response.embeddings[0] && response.embeddings[0].values) {
+  //  console.log("Generated embedding:", response.embeddings[0].values.length);
+    // The vector is in response.embedding.values
+    return response.embeddings[0].values;
+  } else {
+    console.warn("No embeddings generated for the provided text.");
+    return [];
+  }
 }
 
 import pdfParse from "pdf-parse";
@@ -272,7 +236,7 @@ export async function searchDocuments(formData: FormData) {
     console.log("Step 1: Extracting keywords...");
     const keywordResp = await genAI.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Extract 2 precise search keywords for this research topic: "${query}". Return as JSON array of strings.`,
+      contents: `Extract 2 precise search keywords for this research topic: "${query}". Return as JSON array of strings.`, 
     });
     const keywordsArray: string[] = JSON.parse(
       (keywordResp.text ?? "").trim().replace(/```json|```/g, "")
@@ -286,7 +250,7 @@ export async function searchDocuments(formData: FormData) {
       model: "gemini-2.5-flash",
       contents: `Given the research topic "${query}" and keywords ${keywordsArray.join(
         ", "
-      )}, return an enhanced research query with proper focus and clear without unessary articles like "A comparative, The Study" return single sentence only.`,
+      )}, return an enhanced research query with proper focus and clear without unessary articles like "A comparative, The Study" return single sentence only.`, 
     });
     const enhancedQuery = (enhancedResp.text ?? "").trim();
     console.log("Enhanced Query:", enhancedQuery);
