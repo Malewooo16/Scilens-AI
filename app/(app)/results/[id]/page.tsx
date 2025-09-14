@@ -1,11 +1,9 @@
 import { prisma } from "@/db/prisma";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import React from "react";
 import Chat from "@/components/Research/Chat";
 import ResearchTable from "@/components/Research/ResearchTable";
 import ReportView from "@/components/Research/ReportView";
-import KnowledgeGraph from "@/components/Research/KnowledgeGraph";
 import Visualizations from "@/components/Research/Visualizations";
 import GapsView from "@/components/Research/GapsView";
 import DownloadButton from "@/components/Research/DownloadButton";
@@ -17,7 +15,6 @@ const Tabs = ({ view, id }: { view: string; id: string }) => {
     { key: "report", label: "Report" },
     { key: "tables", label: "Tables" },
     { key: "chat", label: "Chat" },
-    { key: "graph", label: "Knowledge Graph" },
     { key: "visualizations", label: "Visualizations" },
     { key: "gaps", label: "Gaps & Limitations" },
   ];
@@ -112,7 +109,7 @@ export default async function ResearchPage({
           <ResearchTable researchQueryId={id} />
         )}
         {activeView === "chat" && <Chat />}
-        {activeView === "graph" && <KnowledgeGraph researchQueryId={id} initialGraphData={researchQuery?.knowledgeGraph} />}
+        {/* {activeView === "graph" && <KnowledgeGraph researchQueryId={id} initialGraphData={researchQuery?.knowledgeGraph} />} */}
         {activeView === "visualizations" && <Visualizations researchQueryId={id} initialVisualizations={researchQuery?.visualizations} />}
         {activeView === "gaps" && <GapsView researchQueryId={id} />}
       </div>
