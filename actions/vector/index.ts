@@ -12,7 +12,7 @@ import { generateEmbedding } from "..";
 
 const genAI = new GoogleGenAI({apiKey: process.env.GOOGLE_API_KEY!});
 
-export async function searchDocs(query: string, topK = 20) {
+export async function searchDocs(query: string, researchQueryId: string, topK = 20) {
 //  console.log("Searching for:", query);
   // 1️⃣ Create query embedding for semantic search
   const embedding = await generateEmbedding(query);
@@ -29,6 +29,7 @@ export async function searchDocs(query: string, topK = 20) {
         )}]') AS distance
     FROM embedding e
     JOIN document d ON e.documentId = d.id
+    WHERE d.researchQueryId = '${researchQueryId}'
     HAVING distance < 1
     ORDER BY distance
     LIMIT ${topK};

@@ -7,9 +7,9 @@ const llm = new ChatGoogleGenerativeAI({
   model: "gemini-2.5-flash-lite", // or "gemini-1.5-flash"
 });
 
-export async function chatBot(query: string) {
+export async function chatBot(query: string, researchQueryId: string) {
   // 1. Get relevant documents
-  const results = await searchDocs(query);
+  const results = await searchDocs(query, researchQueryId);
 
  // console.log("Search Results:", results);
 

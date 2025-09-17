@@ -14,7 +14,7 @@ export async function generateAndStoreKnowledgeGraph(researchQueryId: string) {
     throw new Error("Research query not found or enhanced query is missing.");
   }
 
-  const searchResults = await searchDocs(researchQuery.enhancedQuery, 20);
+  const searchResults = await searchDocs(researchQuery.enhancedQuery, researchQueryId, 20);
 
   const context = searchResults
     .map(

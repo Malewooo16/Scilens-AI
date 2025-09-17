@@ -108,7 +108,7 @@ export default async function ResearchPage({
         {activeView === "tables" && (
           <ResearchTable researchQueryId={id} />
         )}
-        {activeView === "chat" && <Chat />}
+        {activeView === "chat" && <Chat researchQueryId={id} />}
         {/* {activeView === "graph" && <KnowledgeGraph researchQueryId={id} initialGraphData={researchQuery?.knowledgeGraph} />} */}
         {activeView === "visualizations" && <Visualizations researchQueryId={id} initialVisualizations={researchQuery?.visualizations} />}
         {activeView === "gaps" && <GapsView researchQueryId={id} />}

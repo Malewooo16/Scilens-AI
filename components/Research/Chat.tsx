@@ -11,7 +11,7 @@ type Message = {
   sources?: any[];
 };
 
-export default function Chat() {
+export default function Chat({ researchQueryId }: { researchQueryId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -23,7 +23,7 @@ export default function Chat() {
       if (!query) return prev;
 
       // Call your server action
-      const response = await chatBot(query);
+      const response = await chatBot(query, researchQueryId);
 
       return {
         answer: response.answer,

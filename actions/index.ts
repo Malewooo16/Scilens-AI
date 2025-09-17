@@ -222,16 +222,38 @@ export async function searchDocumentsOnDemand(researchQueryId: string, tab: 'tab
 // ---------------------- Main Server Action ----------------------
 
 
-export async function searchDocuments(formData: FormData) {
+export async function searchDocuments(formData: FormData): Promise<{ success: boolean; redirectPath?: string; error?: string; redirectToPricing?: boolean }> {
   const query = formData.get("query")?.toString().trim();
-  if (!query) return redirect("/error");
+  if (!query) return { success: false, error: "Query cannot be empty." };
 
   console.log(`Starting search for query: "${query}"`);
   const startTime = Date.now();
 
-  let redirectPath: string | null = null;
-
   try {
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      return { success: false, error: "User not authenticated.", redirectPath: "/api/auth/signin" };
+    }
+
+    // Check daily query limit
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to the beginning of today
+
+    const researchQueriesToday = await prisma.researchQuery.count({
+      where: {
+        userId: userId,
+        createdAt: {
+          gte: today,
+        },
+      },
+    });
+
+    if (researchQueriesToday >= 2) {
+      return { success: false, error: "Daily research query limit reached. Please subscribe to Pro for unlimited queries.", redirectToPricing: true };
+    }
+
     // Step 1: Extract keywords
     console.log("Step 1: Extracting keywords...");
     const keywordResp = await genAI.models.generateContent({
@@ -255,14 +277,13 @@ export async function searchDocuments(formData: FormData) {
     const enhancedQuery = (enhancedResp.text ?? "").trim();
     console.log("Enhanced Query:", enhancedQuery);
 
-    const session = await auth();
     // Step 3: Create research query entry in DB
     console.log("Step 3: Creating research query entry in DB...");
     const researchQuery = await prisma.researchQuery.create({
       data: {
         originalQuery: query,
         enhancedQuery,
-        userId: session?.user?.id as string, // replace with session user ID
+        userId: userId,
       },
     });
     console.log(`Research query created with ID: ${researchQuery.id}`);
@@ -277,7 +298,7 @@ export async function searchDocuments(formData: FormData) {
     await processPDFs(
       arxivPapers,
       researchQuery.id,
-      session?.user?.id as string
+      userId
     );
     console.log("Finished processing PDFs.");
 
@@ -300,11 +321,9 @@ export async function searchDocuments(formData: FormData) {
     const endTime = Date.now();
     console.log(`Total search process took ${endTime - startTime}ms`);
 
-    redirectPath = `/results/${researchQuery.id}`;
-  } catch (err) {
+    return { success: true, redirectPath: `/results/${researchQuery.id}` };
+  } catch (err: any) {
     console.error("searchDocuments main error:", err);
-    redirect("/error");
-  } finally {
-    if (redirectPath) redirect(redirectPath);
+    return { success: false, error: err.message || "An unknown error occurred." };
   }
 }
